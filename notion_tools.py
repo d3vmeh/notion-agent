@@ -28,12 +28,12 @@ def add_task_to_notion(title, due_date, priority = "Medium", category = "General
     )
 
 
-add_task_to_notion(
-    "Test Task",
-    due_date = datetime.datetime(2025, 6, 12, 15, 0),
-    priority = "High",
-    category = "Personal",
-    status = "In Progress"
-)
+#add_task_to_notion(
+#    "Test Task",
+#    due_date = datetime.datetime(2025, 6, 12, 15, 0),
+#    priority = "High",
+#    category = "Personal",
+#    status = "In Progress"
+#)
 
-print("Task added to Notion")
+#print("Task added to Notion")
