@@ -3,6 +3,7 @@ import os
 import json
 from datetime import datetime
 from notion_tools import add_task_to_notion
+import ast
 
 api_key = os.getenv("OPENAI_API_KEY")
 
@@ -133,7 +134,6 @@ def request_task_addition(question):
         except json.JSONDecodeError as e:
             print(f"JSON decode error: {e}")
             try:
-                import ast
                 response_dict = ast.literal_eval(cleaned_response)
                 return response_dict
             except Exception as ast_error:
