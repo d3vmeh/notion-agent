@@ -54,7 +54,8 @@ def request_task_addition(question):
                 "due_date": "YYYY-MM-DD HH:MM",
                 "priority": "Low/Medium/High",
                 "category": "General/Personal/Fitness/Fun/School",
-                "status": "To-Do/In Progress/Completed"
+                "status": "To-Do/In Progress/Completed",
+                "notes": "Additional details, description, or context about the task"
             }
 
             IMPORTANT RULES:
@@ -62,49 +63,65 @@ def request_task_addition(question):
             2. Priority must be exactly one of: "Low", "Medium", or "High" (case-sensitive)
             3. Category must be exactly one of: "General", "Personal", "Fitness", "Fun", or "School" (case-sensitive)
             4. Status must be exactly one of: "To-Do", "In Progress", or "Completed" (case-sensitive)
-            5. If the user doesn't specify a field, use these defaults:
+            5. Notes should contain relevant details, context, or description about the task
+            6. If the user doesn't specify a field, use these defaults:
                - priority: "Medium"
                - category: "General"
                - status: "To-Do"
-            6. For the due_date, if the user doesn't specify a time, default to "12:00"
-            7. If the user doesn't specify a date, use today's date. Today's date is """ + str(datetime.now().strftime("%Y-%m-%d")) + """
+               - notes: "" (empty string if no details provided)
+            7. For the due_date, if the user doesn't specify a time, default to "12:00"
+            8. If the user doesn't specify a date, use today's date. Today's date is """ + str(datetime.now().strftime("%Y-%m-%d")) + """
 
             EXAMPLES:
 
-            User: "Add a meeting with John tomorrow at 2pm" (today's date is 2025-06-11)
+            User: "Add a meeting with John tomorrow at 2pm to discuss the new project requirements"
             Response: {
                 "task_name": "Meeting with John",
                 "due_date": "2025-06-12 14:00",
                 "priority": "Medium",
                 "category": "General",
-                "status": "To-Do"
+                "status": "To-Do",
+                "notes": "Discuss new project requirements"
             }
 
-            User: "High priority workout session"
+            User: "High priority workout session - need to focus on cardio and strength training"
             Response: {
                 "task_name": "Workout session",
                 "due_date": "2025-05-15 12:00",
                 "priority": "High",
                 "category": "Fitness",
-                "status": "To-Do"
+                "status": "To-Do",
+                "notes": "Focus on cardio and strength training"
             }
 
-            User: "Complete the math homework for school"
+            User: "Complete the math homework for school - chapters 5 and 6, due next week"
             Response: {
                 "task_name": "Complete math homework",
                 "due_date": "2025-03-15 12:00",
                 "priority": "Medium",
                 "category": "School",
-                "status": "To-Do"
+                "status": "To-Do",
+                "notes": "Chapters 5 and 6, due next week"
             }
 
-            User: "Watch a movie tonight at 8pm for fun"
+            User: "Watch a movie tonight at 8pm for fun - planning to watch the new sci-fi film"
             Response: {
                 "task_name": "Watch a movie",
                 "due_date": "2025-06-11 20:00",
                 "priority": "Low",
                 "category": "Fun",
-                "status": "To-Do"
+                "status": "To-Do",
+                "notes": "Planning to watch the new sci-fi film"
+            }
+
+            User: "Doctor appointment next Friday at 10am for annual checkup"
+            Response: {
+                "task_name": "Doctor appointment",
+                "due_date": "2025-06-20 10:00",
+                "priority": "High",
+                "category": "Personal",
+                "status": "To-Do",
+                "notes": "Annual checkup"
             }
 
             CRITICAL: Respond with ONLY valid JSON. No comments, no explanations, no additional text outside the JSON structure.
@@ -158,8 +175,9 @@ while True:
     priority = response['priority']
     category = response['category']
     status = response['status']
+    notes = response['notes']
 
     due_date = datetime.strptime(due_date_str, "%Y-%m-%d %H:%M")
 
-    add_task_to_notion(task_name, due_date, priority, category, status)
+    add_task_to_notion(task_name, due_date, priority, category, status, notes)
     print("Task added to Notion successfully!")

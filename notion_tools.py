@@ -15,7 +15,7 @@ f.close()
 
 notion = Client(auth=notion_token)
 
-def add_task_to_notion(title, due_date, priority = "Medium", category = "General", status = "To-Do"):
+def add_task_to_notion(title, due_date, priority = "Medium", category = "General", status = "To-Do", notes = ""):
     notion.pages.create(
         parent={"database_id": database_id},
         properties={
@@ -23,17 +23,19 @@ def add_task_to_notion(title, due_date, priority = "Medium", category = "General
             "Due Date": {"date": {"start": due_date.isoformat()}},
             "Priority": {"select": {"name": priority}},
             "Category": {"select": {"name": category}},
-            "Status": {"select": {"name": status}}
+            "Status": {"select": {"name": status}},
+            "Notes Page": {"rich_text": [{"text": {"content": notes}}]}
         }
     )
 
 
 #add_task_to_notion(
 #    "Test Task",
-#    due_date = datetime.datetime(2025, 6, 12, 15, 0),
+#    due_date = datetime.datetime(2025, 6, 14, 15, 0),
 #    priority = "High",
 #    category = "Personal",
-#    status = "In Progress"
+#    status = "In Progress",
+#    notes = "This is a test note"
 #)
 
 #print("Task added to Notion")
