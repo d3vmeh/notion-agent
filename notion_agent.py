@@ -3,6 +3,7 @@ import os
 import json
 from datetime import datetime
 from notion_tools import add_task_to_notion
+from speech_tools import listen_for_speech
 import ast
 
 api_key = os.getenv("OPENAI_API_KEY")
@@ -160,24 +161,90 @@ def request_task_addition(question):
         return {"error": "No valid response from model"}
 
 
-while True:
+def get_task_input():
+    while True:
+        print("NOTION TASK AGENT")
+        print("="*50)
+        print("Choose input method:")
+        print("1. 🎤 Speech input")
+        print("2. ⌨️  Text input")
+        print("3. ❌ Exit")
+        print("-"*50)
+        
+        choice = input("Enter your choice (1-3): ").strip()
+        
+        if choice == "1":
+            print("\n🎤 Switching to speech mode...")
+            speech_text = listen_for_speech()
+            
+            if speech_text:
+                if speech_text == "quit":
+                    print("👋 Goodbye!")
+                    return None
 
-    question = input("Enter a notion task: ")
-    response = request_task_addition(question)
-    print(response)
+                else:
+                    return speech_text
+            else:
+                print("❌ Speech input failed. Please try again or choose text input.")
+                continue
+                
+        elif choice == "2":
+            print("\nText input mode:")
+            text_input = input("Enter your task description: ").strip()
+            
+            if text_input.lower() in ['quit', 'exit', 'q']:
+                print("👋 Goodbye!")
+                return None
+
+            elif text_input:
+                return text_input
+            else:
+                print("❌ Please enter a valid task description.")
+                continue
+                
+        elif choice == "3":
+            print("👋 Goodbye!")
+            return None
+            
+        else:
+            print("❌ Invalid choice. Please enter 1, 2, or 3.")
+
+
+def main():
+    print("Starting Notion Task Agent...")
+    print("💡 Tips:")
+    print("   - Say 'quit' to exit")
+    print("   - Be specific about dates, times, and details")
     
-    if "error" in response:
-        print("Error occurred:", response["error"])
-        continue
-    
-    task_name = response['task_name']
-    due_date_str = response['due_date']
-    priority = response['priority']
-    category = response['category']
-    status = response['status']
-    notes = response['notes']
+    while True:
+        question = get_task_input()
+        
+        if question is None:
+            break
+            
+        print(f"\n📝 Processing: '{question}'")
+        response = request_task_addition(question)
+        print(response)
+        
+        if "error" in response:
+            print("❌ Error occurred:", response["error"])
+            continue
+        
+        task_name = response['task_name']
+        due_date_str = response['due_date']
+        priority = response['priority']
+        category = response['category']
+        status = response['status']
+        notes = response['notes']
 
-    due_date = datetime.strptime(due_date_str, "%Y-%m-%d %H:%M")
+        due_date = datetime.strptime(due_date_str, "%Y-%m-%d %H:%M")
 
-    add_task_to_notion(task_name, due_date, priority, category, status, notes)
-    print("Task added to Notion successfully!")
+        try:
+            add_task_to_notion(task_name, due_date, priority, category, status, notes)
+            print("✅ Task added to Notion successfully!")
+        except Exception as e:
+            print(f"❌ Error adding task to Notion: {e}")
+
+
+if __name__ == "__main__":
+    main()
