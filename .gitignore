@@ -1,5 +1,2 @@
 __pycache__/
-debug_notion.py
-test_microphone.py
-requirements.txt
-ids.txt
+debug/debug_notion.py
