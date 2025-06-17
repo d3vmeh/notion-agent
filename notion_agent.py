@@ -2,7 +2,7 @@ import requests
 import os
 import json
 from datetime import datetime
-from notion_tools import add_task_to_notion
+from notion_tools import add_tasks_to_notion
 from speech_tools import *
 import ast
 
@@ -46,18 +46,20 @@ def request_task_addition(question):
             
             You are an assistant that helps make and maintain a daily schedule on Notion.
 
-            The user will ask you to add a task to their Notion schedule and provide you the details.
+            The user will ask you to add one or more tasks to their Notion schedule and provide you the details.
 
-            You must respond in a JSON format with the following structure:
+            You must respond in a JSON format with the following structure - an array of tasks:
 
-            {
-                "task_name": "The name/title of the task",
-                "due_date": "YYYY-MM-DD HH:MM",
-                "priority": "Low/Medium/High",
-                "category": "General/Personal/Fitness/Fun/School",
-                "status": "To-Do/In Progress/Completed",
-                "notes": "Additional details, description, or context about the task"
-            }
+            [
+                {
+                    "task_name": "The name/title of the task",
+                    "due_date": "YYYY-MM-DD HH:MM",
+                    "priority": "Low/Medium/High",
+                    "category": "General/Personal/Fitness/Fun/School",
+                    "status": "To-Do/In Progress/Completed",
+                    "notes": "Additional details, description, or context about the task"
+                }
+            ]
 
             IMPORTANT RULES:
             1. The due_date must be in the format "YYYY-MM-DD HH:MM" (24-hour format)
@@ -72,62 +74,102 @@ def request_task_addition(question):
                - notes: "" (empty string if no details provided)
             7. For the due_date, if the user doesn't specify a time, default to "12:00"
             8. If the user doesn't specify a date, use today's date. Today's date is """ + str(datetime.now().strftime("%Y-%m-%d")) + """
+            9. ALWAYS return an array, even if there's only one task
+            10. If the user mentions multiple tasks, separate them into individual objects in the array
 
             EXAMPLES:
 
             User: "Add a meeting with John tomorrow at 2pm to discuss the new project requirements"
-            Response: {
-                "task_name": "Meeting with John",
-                "due_date": "2025-06-12 14:00",
-                "priority": "Medium",
-                "category": "General",
-                "status": "To-Do",
-                "notes": "Discuss new project requirements"
-            }
+            Response: [
+                {
+                    "task_name": "Meeting with John",
+                    "due_date": "2025-06-12 14:00",
+                    "priority": "Medium",
+                    "category": "General",
+                    "status": "To-Do",
+                    "notes": "Discuss new project requirements"
+                }
+            ]
+
+            User: "Add three tasks: workout tomorrow at 6am, buy groceries today at 5pm, and call mom on Friday at 3pm"
+            Response: [
+                {
+                    "task_name": "Workout",
+                    "due_date": "2025-06-17 06:00",
+                    "priority": "Medium",
+                    "category": "Fitness",
+                    "status": "To-Do",
+                    "notes": ""
+                },
+                {
+                    "task_name": "Buy groceries",
+                    "due_date": "2025-06-16 17:00",
+                    "priority": "Medium",
+                    "category": "General",
+                    "status": "To-Do",
+                    "notes": ""
+                },
+                {
+                    "task_name": "Call mom",
+                    "due_date": "2025-06-20 15:00",
+                    "priority": "Medium",
+                    "category": "Personal",
+                    "status": "To-Do",
+                    "notes": ""
+                }
+            ]
 
             User: "High priority workout session - need to focus on cardio and strength training"
-            Response: {
-                "task_name": "Workout session",
-                "due_date": "2025-05-15 12:00",
-                "priority": "High",
-                "category": "Fitness",
-                "status": "To-Do",
-                "notes": "Focus on cardio and strength training"
-            }
+            Response: [
+                {
+                    "task_name": "Workout session",
+                    "due_date": "2025-06-16 12:00",
+                    "priority": "High",
+                    "category": "Fitness",
+                    "status": "To-Do",
+                    "notes": "Focus on cardio and strength training"
+                }
+            ]
 
             User: "Complete the math homework for school - chapters 5 and 6, due next week"
-            Response: {
-                "task_name": "Complete math homework",
-                "due_date": "2025-03-15 12:00",
-                "priority": "Medium",
-                "category": "School",
-                "status": "To-Do",
-                "notes": "Chapters 5 and 6, due next week"
-            }
+            Response: [
+                {
+                    "task_name": "Complete math homework",
+                    "due_date": "2025-06-22 12:00",
+                    "priority": "Medium",
+                    "category": "School",
+                    "status": "To-Do",
+                    "notes": "Chapters 5 and 6, due next week"
+                }
+            ]
 
             User: "Watch a movie tonight at 8pm for fun - planning to watch the new sci-fi film"
-            Response: {
-                "task_name": "Watch a movie",
-                "due_date": "2025-06-11 20:00",
-                "priority": "Low",
-                "category": "Fun",
-                "status": "To-Do",
-                "notes": "Planning to watch the new sci-fi film"
-            }
+            Response: [
+                {
+                    "task_name": "Watch a movie",
+                    "due_date": "2025-06-16 20:00",
+                    "priority": "Low",
+                    "category": "Fun",
+                    "status": "To-Do",
+                    "notes": "Planning to watch the new sci-fi film"
+                }
+            ]
 
             User: "Doctor appointment next Friday at 10am for annual checkup"
-            Response: {
-                "task_name": "Doctor appointment",
-                "due_date": "2025-06-20 10:00",
-                "priority": "High",
-                "category": "Personal",
-                "status": "To-Do",
-                "notes": "Annual checkup"
-            }
+            Response: [
+                {
+                    "task_name": "Doctor appointment",
+                    "due_date": "2025-06-20 10:00",
+                    "priority": "High",
+                    "category": "Personal",
+                    "status": "To-Do",
+                    "notes": "Annual checkup"
+                }
+            ]
 
             CRITICAL: Respond with ONLY valid JSON. No comments, no explanations, no additional text outside the JSON structure.
 
-            Here is the task the user wants to add: """ + question + """
+            Here is the task(s) the user wants to add: """ + question + """
             """
             
             }
@@ -264,6 +306,7 @@ def main():
     print("   - Be specific about dates, times, and details")
     print("   - For speech: Speak clearly and pause when done")
     print("   - For push-to-talk: Use SPACE or ENTER to control recording")
+    print("   - You can add multiple tasks at once by mentioning them together")
     
     while True:
         question = get_task_input()
@@ -279,20 +322,36 @@ def main():
             print("❌ Error occurred:", response["error"])
             continue
         
-        task_name = response['task_name']
-        due_date_str = response['due_date']
-        priority = response['priority']
-        category = response['category']
-        status = response['status']
-        notes = response['notes']
-
-        due_date = datetime.strptime(due_date_str, "%Y-%m-%d %H:%M")
-
+        if not isinstance(response, list):
+            print("❌ Unexpected response format - expected list of tasks")
+            continue
+        
+        tasks = response
+        
+        print(f"\n📋 Found {len(tasks)} task(s) to add:")
+        for i, task in enumerate(tasks, 1):
+            print(f"  {i}. {task['task_name']} - {task['due_date']} ({task['priority']} priority)")
+        
         try:
-            add_task_to_notion(task_name, due_date, priority, category, status, notes)
-            print("✅ Task added to Notion successfully!")
+            results = add_tasks_to_notion(tasks)
+            
+            successful = 0
+            failed = 0
+            for result in results:
+                if result['status'] == 'success':
+                    successful += 1
+                    print(f"✅ Added: {result['task']}")
+                else:
+                    failed += 1
+                    print(f"❌ Failed to add {result['task']}: {result['error']}")
+            
+            if successful > 0:
+                print(f"\n🎉 Successfully added {successful} task(s) to Notion!")
+            if failed > 0:
+                print(f"⚠️  Failed to add {failed} task(s)")
+                
         except Exception as e:
-            print(f"❌ Error adding task to Notion: {e}")
+            print(f"❌ Error adding tasks to Notion: {e}")
 
 
 if __name__ == "__main__":
