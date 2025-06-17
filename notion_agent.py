@@ -217,7 +217,7 @@ def get_task_input():
         
         if choice == "1":
             print("\n🎤 Switching to speech mode...")
-            print("💡 Tip: HOLD DOWN SPACE while talking, RELEASE to stop")
+            print("💡 Tip: Press ENTER to start recording, speak clearly and pause when done")
             speech_text = listen_for_speech_push_to_talk()
             
             if speech_text:
@@ -226,6 +226,9 @@ def get_task_input():
                     return None
                 else:
                     return speech_text
+            elif speech_text is None:
+                print("🔄 Returning to menu...")
+                continue
             else:
                 print("❌ Speech input failed. Please try again or choose text input.")
                 continue
@@ -256,7 +259,7 @@ def main():
     print("💡 Tips:")
     print("   - Say 'quit' to exit")
     print("   - Be specific about dates, times, and details")
-    print("   - For speech: HOLD DOWN SPACE while talking, RELEASE to stop")
+    print("   - For speech: Press ENTER to start, speak clearly and pause when done")
     print("   - You can add multiple tasks at once by mentioning them together")
     
     while True:

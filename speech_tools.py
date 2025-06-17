@@ -1,16 +1,17 @@
 import speech_recognition as sr
-import keyboard
 import time
+import threading
+import queue
+            
 
 
 def listen_for_speech_push_to_talk():
-    """Simple push-to-talk: Hold SPACE to record, release to stop"""
     recognizer = sr.Recognizer()
     
     with sr.Microphone() as source:
         print("🎤 Push-to-Talk Mode")
-        print("HOLD DOWN SPACE while talking")
-        print("RELEASE SPACE when done")
+        print("Press ENTER to start recording")
+        print("Speak clearly and pause when done")
         print("(Say 'quit' to exit)")
         
         print("Adjusting for ambient noise...")
@@ -18,21 +19,26 @@ def listen_for_speech_push_to_talk():
         
         recognizer.energy_threshold = 100
         recognizer.dynamic_energy_threshold = True
-        recognizer.pause_threshold = 0.3
+        recognizer.pause_threshold = 5.0  # After 5 seconds of silence, the recording stops
+        recognizer.non_speaking_duration = 2.0
         
         try:
-            print("🎤 HOLD SPACE and start talking...")
+            print("🎤 Press ENTER to start recording...")
+            input()  
             
-            while not keyboard.is_pressed('space'):
-                time.sleep(0.1)
-            
-            print("🟢 Recording... (Release SPACE to stop)")
+            print("🟢 Recording... Speak now!")
+            print("💡 The recording will stop when you pause speaking")
             
             audio = recognizer.listen(source, timeout=10, phrase_time_limit=30)
             
             print("🔄 Processing speech...")
             text = recognizer.recognize_google(audio)
-            print(f"✅ You said: '{text}'")
+            
+            print("\n📝 TRANSCRIPTION:")
+            print("=" * 50)
+            print(f"'{text}'")
+            print("=" * 50)
+            
             return text.lower()
             
         except sr.WaitTimeoutError:
@@ -46,4 +52,7 @@ def listen_for_speech_push_to_talk():
             return None
         except Exception as e:
             print(f"❌ Error: {e}")
+            print(f"❌ Error type: {type(e).__name__}")
+            import traceback
+            print(f"❌ Full traceback: {traceback.format_exc()}")
             return None
