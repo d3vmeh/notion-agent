@@ -208,20 +208,17 @@ def get_task_input():
         print("NOTION TASK AGENT")
         print("="*50)
         print("Choose input method:")
-        print("1. 🎤 Speech input (standard)")
-        print("2. 🎤 Speech input (continuous)")
-        print("3. 🎤 Push-to-Talk (HOLD SPACE)")
-        print("4. 🎤 Push-to-Talk (ENTER start/stop)")
-        print("5. ⌨️  Text input")
-        print("6. ❌ Exit")
+        print("1. 🎤 Speech input (Push-to-Talk)")
+        print("2. ⌨️  Text input")
+        print("3. ❌ Exit")
         print("-"*50)
         
-        choice = input("Enter your choice (1-6): ").strip()
+        choice = input("Enter your choice (1-3): ").strip()
         
         if choice == "1":
-            print("\n🎤 Switching to speech mode (standard)...")
-            print("💡 Tip: Speak clearly and pause briefly when done")
-            speech_text = listen_for_speech()
+            print("\n🎤 Switching to speech mode...")
+            print("💡 Tip: HOLD DOWN SPACE while talking, RELEASE to stop")
+            speech_text = listen_for_speech_push_to_talk()
             
             if speech_text:
                 if speech_text == "quit":
@@ -234,51 +231,6 @@ def get_task_input():
                 continue
                 
         elif choice == "2":
-            print("\n🎤 Switching to speech mode (continuous)...")
-            print("💡 Tip: Speak naturally and pause when finished")
-            speech_text = listen_for_speech_continuous()
-            
-            if speech_text:
-                if speech_text == "quit":
-                    print("👋 Goodbye!")
-                    return None
-                else:
-                    return speech_text
-            else:
-                print("❌ Speech input failed. Please try again or choose text input.")
-                continue
-                
-        elif choice == "3":
-            print("\n🎤 Switching to push-to-talk mode...")
-            print("💡 Tip: HOLD DOWN SPACE while talking, RELEASE to stop")
-            speech_text = listen_for_speech_true_push_to_talk()
-            
-            if speech_text:
-                if speech_text == "quit":
-                    print("👋 Goodbye!")
-                    return None
-                else:
-                    return speech_text
-            else:
-                print("❌ Speech input failed. Please try again or choose text input.")
-                continue
-                
-        elif choice == "4":
-            print("\n🎤 Switching to push-to-talk mode...")
-            print("💡 Tip: Press ENTER to start, press ENTER again to stop")
-            speech_text = listen_for_speech_simple_push_to_talk()
-            
-            if speech_text:
-                if speech_text == "quit":
-                    print("👋 Goodbye!")
-                    return None
-                else:
-                    return speech_text
-            else:
-                print("❌ Speech input failed. Please try again or choose text input.")
-                continue
-                
-        elif choice == "5":
             print("\nText input mode:")
             text_input = input("Enter your task description: ").strip()
             
@@ -291,12 +243,12 @@ def get_task_input():
                 print("❌ Please enter a valid task description.")
                 continue
                 
-        elif choice == "6":
+        elif choice == "3":
             print("👋 Goodbye!")
             return None
             
         else:
-            print("❌ Invalid choice. Please enter 1, 2, 3, 4, 5, or 6.")
+            print("❌ Invalid choice. Please enter 1, 2, or 3.")
 
 
 def main():
@@ -304,8 +256,7 @@ def main():
     print("💡 Tips:")
     print("   - Say 'quit' to exit")
     print("   - Be specific about dates, times, and details")
-    print("   - For speech: Speak clearly and pause when done")
-    print("   - For push-to-talk: Use SPACE or ENTER to control recording")
+    print("   - For speech: HOLD DOWN SPACE while talking, RELEASE to stop")
     print("   - You can add multiple tasks at once by mentioning them together")
     
     while True:
