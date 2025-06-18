@@ -171,6 +171,270 @@ def add_tasks_to_notion(tasks):
     
     return results
 
+def get_tasks_from_notion(filters=None, sort_by=None, limit=50):
+    """
+    Retrieve tasks from Notion database with optional filtering and sorting.
+    
+    Args:
+        filters (dict): Filter criteria (e.g., {"category": "Fitness", "status": "To-Do"})
+        sort_by (dict): Sort criteria (e.g., {"property": "Due Date", "direction": "ascending"})
+        limit (int): Maximum number of tasks to return
+    
+    Returns:
+        dict: Dictionary with tasks list and metadata
+    """
+    if not notion:
+        return {"error": "Notion client not initialized"}
+    
+    try:
+        filter_conditions = []
+        if filters:
+            for property_name, value in filters.items():
+                if property_name == "category":
+                    filter_conditions.append({
+                        "property": "Category",
+                        "select": {"equals": value}
+                    })
+                elif property_name == "priority":
+                    filter_conditions.append({
+                        "property": "Priority", 
+                        "select": {"equals": value}
+                    })
+                elif property_name == "status":
+                    filter_conditions.append({
+                        "property": "Status",
+                        "select": {"equals": value}
+                    })
+                elif property_name == "date_range":
+                    start_date, end_date = value
+                    filter_conditions.append({
+                        "property": "Due Date",
+                        "date": {
+                            "on_or_after": start_date,
+                            "on_or_before": end_date
+                        }
+                    })
+        
+        sorts = []
+        if sort_by:
+            if sort_by.get("property") == "due_date":
+                sorts.append({
+                    "property": "Due Date",
+                    "direction": sort_by.get("direction", "ascending")
+                })
+            elif sort_by.get("property") == "priority":
+                sorts.append({
+                    "property": "Priority",
+                    "direction": sort_by.get("direction", "descending")
+                })
+        
+        if not sorts:
+            sorts.append({
+                "property": "Due Date",
+                "direction": "ascending"
+            })
+        
+        print(f"🔍 Querying Notion database: {database_id}")
+        print(f"📊 Filters: {filter_conditions}")
+        print(f"📈 Sort: {sorts}")
+        print(f"📏 Limit: {limit}")
+        
+        response = notion.databases.query(
+            database_id=database_id,
+            filter={"and": filter_conditions} if filter_conditions else None,
+            sorts=sorts,
+            page_size=limit
+        )
+        
+        tasks = []
+        for page in response["results"]:
+            properties = page["properties"]
+            
+            task_name = ""
+            if properties.get("Task", {}).get("title"):
+                task_name = properties["Task"]["title"][0]["text"]["content"]
+            
+            due_date = None
+            if properties.get("Due Date", {}).get("date", {}).get("start"):
+                due_date = properties["Due Date"]["date"]["start"]
+            
+            priority = ""
+            if properties.get("Priority", {}).get("select"):
+                priority = properties["Priority"]["select"]["name"]
+            
+            category = ""
+            if properties.get("Category", {}).get("select"):
+                category = properties["Category"]["select"]["name"]
+            
+            status = ""
+            if properties.get("Status", {}).get("select"):
+                status = properties["Status"]["select"]["name"]
+            
+            notes = ""
+            if properties.get("Notes Page", {}).get("rich_text"):
+                notes = properties["Notes Page"]["rich_text"][0]["text"]["content"]
+            
+            tasks.append({
+                "id": page["id"],
+                "task_name": task_name,
+                "due_date": due_date,
+                "priority": priority,
+                "category": category,
+                "status": status,
+                "notes": notes,
+                "created_time": page["created_time"],
+                "last_edited_time": page["last_edited_time"]
+            })
+        
+        print(f"✅ Retrieved {len(tasks)} tasks from Notion")
+        
+        return {
+            "tasks": tasks,
+            "total": len(tasks),
+            "has_more": response.get("has_more", False)
+        }
+        
+    except Exception as e:
+        error_msg = f"Failed to retrieve tasks: {str(e)}"
+        print(f"❌ {error_msg}")
+        return {"error": error_msg}
+
+def update_task_in_notion(task_id, updates):
+    if not notion:
+        return {"error": "Notion client not initialized"}
+    
+    try:
+        properties = {}
+        
+        if "task_name" in updates:
+            properties["Task"] = {"title": [{"text": {"content": updates["task_name"]}}]}
+        
+        if "due_date" in updates:
+            due_date = updates["due_date"]
+            if isinstance(due_date, str):
+                due_date = datetime.datetime.strptime(due_date, "%Y-%m-%d %H:%M")
+            
+            if due_date.tzinfo is None:
+                local_tz = datetime.datetime.now().astimezone().tzinfo
+                due_date = due_date.replace(tzinfo=local_tz)
+            
+            properties["Due Date"] = {"date": {"start": due_date.isoformat()}}
+        
+        if "priority" in updates:
+            properties["Priority"] = {"select": {"name": updates["priority"]}}
+        
+        if "category" in updates:
+            properties["Category"] = {"select": {"name": updates["category"]}}
+        
+        if "status" in updates:
+            properties["Status"] = {"select": {"name": updates["status"]}}
+        
+        if "notes" in updates:
+            properties["Notes Page"] = {"rich_text": [{"text": {"content": updates["notes"]}}]}
+        
+        if not properties:
+            return {"error": "No valid updates provided"}
+        
+        print(f"🔄 Updating task {task_id} with: {list(properties.keys())}")
+        
+        updated_page = notion.pages.update(page_id=task_id, properties=properties)
+        
+        print(f"✅ Task updated successfully")
+        
+        return {
+            "status": "success",
+            "task_id": task_id,
+            "updated_fields": list(properties.keys())
+        }
+        
+    except Exception as e:
+        error_msg = f"Failed to update task: {str(e)}"
+        print(f"❌ {error_msg}")
+        return {"error": error_msg}
+
+
+def delete_task_from_notion(task_id):
+    if not notion:
+        return {"error": "Notion client not initialized"}
+    
+    try:
+        print(f"🗑️  Archiving task {task_id}")
+        
+        archived_page = notion.pages.update(page_id=task_id, archived=True)
+        
+        print(f"✅ Task archived successfully")
+        
+        return {
+            "status": "success",
+            "task_id": task_id,
+            "message": "Task archived successfully"
+        }
+        
+    except Exception as e:
+        error_msg = f"Failed to archive task: {str(e)}"
+        print(f"❌ {error_msg}")
+        return {"error": error_msg}
+
+
+def search_tasks_in_notion(query, limit=20):
+    if not notion:
+        return {"error": "Notion client not initialized"}
+    
+    try:
+        print(f"🔍 Searching for tasks containing: '{query}'")
+        
+        response = notion.search(
+            query=query,
+            filter={"property": "object", "value": "page"},
+            page_size=limit
+        )
+        
+        tasks = []
+        for page in response["results"]:
+            if page.get("parent", {}).get("database_id") == database_id:
+                properties = page["properties"]
+                
+                task_name = ""
+                if properties.get("Task", {}).get("title"):
+                    task_name = properties["Task"]["title"][0]["text"]["content"]
+                
+                due_date = None
+                if properties.get("Due Date", {}).get("date", {}).get("start"):
+                    due_date = properties["Due Date"]["date"]["start"]
+                
+                priority = ""
+                if properties.get("Priority", {}).get("select"):
+                    priority = properties["Priority"]["select"]["name"]
+                
+                category = ""
+                if properties.get("Category", {}).get("select"):
+                    category = properties["Category"]["select"]["name"]
+                
+                status = ""
+                if properties.get("Status", {}).get("select"):
+                    status = properties["Status"]["select"]["name"]
+                
+                tasks.append({
+                    "id": page["id"],
+                    "task_name": task_name,
+                    "due_date": due_date,
+                    "priority": priority,
+                    "category": category,
+                    "status": status
+                })
+        
+        print(f"✅ Search found {len(tasks)} tasks")
+        
+        return {
+            "tasks": tasks,
+            "total": len(tasks),
+            "query": query
+        }
+        
+    except Exception as e:
+        error_msg = f"Search failed: {str(e)}"
+        print(f"❌ {error_msg}")
+        return {"error": error_msg}
 
 #add_tasks_to_notion([
 #    {

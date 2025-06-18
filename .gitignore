@@ -4,3 +4,4 @@ check_database.py
 test_single_task.py
 check_database_structure.py
 check_database_views.py
+test_task_retrieval.py
