@@ -27,6 +27,8 @@ def determine_user_intent(user_input):
             You are a helpful assistant that helps the user manage their Notion schedule.
             You are responsible for determining the user's intent and responding accordingly.
 
+            Today's date is """ + str(datetime.now().strftime("%Y-%m-%d")) + """.
+
             The user will ask you to complete a task for them. You need to classify the task into one of the following INTENT TYPES:
 
             1. CREATE_TASK - User wants to add new task(s) to their Notion schedule
@@ -72,6 +74,9 @@ def determine_user_intent(user_input):
         print(f"Error classifying intent: {e}")
         return "UNKNOWN"
 
+"""
+TASK CREATION
+"""
 
 def request_task_addition(question):
     headers = {
@@ -246,7 +251,6 @@ def request_task_addition(question):
     else:
         return {"error": "No valid response from model"}
 
-
 def handle_task_creation(user_input):
     """
     Task Creation Handler
@@ -296,10 +300,237 @@ def handle_task_creation(user_input):
         print(f"❌ Error adding tasks to Notion: {e}")
         return False
 
+"""
+TASK QUERYING
+"""
+
+def parse_query_parameters(user_input):
+    """
+    Parse user input to extract query parameters for task retrieval.
+    This function converts natural language into structured query parameters.
+    """
+    
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+
+    payload = {
+        "model": "gpt-4o-mini",
+        "messages": [
+            {
+                "role": "user",
+                "content": f"""
+                Parse the user's query to extract filtering and sorting parameters for task retrieval.
+                
+                Extract the following information:
+                1. Date range (today, this week, this month, tomorrow, next week, etc.)
+                2. Category filter (General, Personal, Fitness, Fun, School)
+                3. Priority filter (Low, Medium, High)
+                4. Status filter (To-Do, In Progress, Completed)
+                5. Sort preference (by due date, priority, etc.)
+                6. Limit (how many tasks to show)
+                
+                Respond in JSON format:
+                {{
+                    "filters": {{
+                        "category": "string or null",
+                        "priority": "string or null", 
+                        "status": "string or null",
+                        "date_range": ["start_date", "end_date"] or null
+                    }},
+                    "sort_by": {{
+                        "property": "due_date or priority",
+                        "direction": "ascending or descending"
+                    }} or null,
+                    "limit": number
+                }}
+                
+                Today's date is {datetime.now().strftime("%Y-%m-%d")}.
+                
+                Examples:
+                - "Show me tasks for this week" → {{"filters": {{"date_range": ["2025-06-16", "2025-06-22"]}}, "sort_by": {{"property": "due_date", "direction": "ascending"}}, "limit": 50}}
+                - "High priority tasks" → {{"filters": {{"priority": "High"}}, "sort_by": {{"property": "due_date", "direction": "ascending"}}, "limit": 50}}
+                - "Completed fitness tasks" → {{"filters": {{"category": "Fitness", "status": "Completed"}}, "sort_by": null, "limit": 50}}
+                - "All tasks" → {{"filters": {{}}, "sort_by": {{"property": "due_date", "direction": "ascending"}}, "limit": 50}}
+                
+                User input: "{user_input}"
+                """
+            }
+        ],
+        "max_tokens": 500
+    }
+    
+    try:
+        response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+        response_data = response.json()
+        
+        if 'choices' in response_data and len(response_data['choices']) > 0:
+            content = response_data['choices'][0]['message']['content'].strip()
+            content = content.strip('```json\n').strip('```').strip()
+            return json.loads(content)
+        else:
+            return {"filters": {}, "sort_by": None, "limit": 50}
+    except Exception as e:
+        print(f"Error parsing query parameters: {e}")
+        return {"filters": {}, "sort_by": None, "limit": 50}
+
+def format_task_display(tasks, title="Tasks"):
+    """
+    Use LLM to generate a natural language summary of the retrieved tasks.
+    """
+
+    if not tasks:
+        return f"No tasks found for {title}"
+    
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+
+    task_summaries = []
+    for i, task in enumerate(tasks, 1):
+        due_date_str = "No due date"
+        if task.get('due_date'):
+            try:
+                if isinstance(task['due_date'], str):
+                    dt = datetime.fromisoformat(task['due_date'].replace('Z', '+00:00'))
+                    due_date_str = dt.strftime("%Y-%m-%d %H:%M")
+                else:
+                    due_date_str = task['due_date']
+            except:
+                due_date_str = str(task['due_date'])
+        
+        task_summary = {
+            "number": i,
+            "name": task.get('task_name', 'Untitled'),
+            "due_date": due_date_str,
+            "priority": task.get('priority', 'N/A'),
+            "category": task.get('category', 'N/A'),
+            "status": task.get('status', 'N/A'),
+            "notes": task.get('notes', ''),
+            "id": task.get('id', '')[:8] if task.get('id') else ''
+        }
+        task_summaries.append(task_summary)
+
+    payload = {
+        "model": "gpt-4o-mini",
+        "messages": [
+            {
+                "role": "user",
+                "content": f"""
+                You are a helpful assistant that summarizes task information in a conversational, natural way.
+                
+                Today's date is {datetime.now().strftime("%Y-%m-%d")}.
+                
+                I have retrieved {len(tasks)} tasks from a Notion database. Please provide a natural language summary that:
+                
+                1. Uses a friendly, conversational tone
+                2. Highlights the most important information (due dates, priorities, status)
+                3. Groups tasks by priority, category, or status when helpful
+                4. Mentions any urgent or overdue tasks prominently
+                5. Provides actionable insights (e.g., "You have 3 high-priority tasks due today")
+                6. Keeps the summary concise but informative
+                
+                Task data:
+                {json.dumps(task_summaries, indent=2)}
+                
+                Original query context: "{title}"
+                
+                Respond with a natural, conversational summary that would be helpful for someone managing their tasks.
+                However, be concise and to the point, as the user is likely busy.
+                """
+            }
+        ],
+        "max_tokens": 800
+    }
+
+    try:
+        response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+        response_data = response.json()
+        
+        if 'choices' in response_data and len(response_data['choices']) > 0:
+            summary = response_data['choices'][0]['message']['content'].strip()
+            return f"\n📋 {title} ({len(tasks)} found):\n" + "=" * 80 + "\n\n" + summary + "\n"
+        else:
+            # If LLM fails, return a simple formatting
+            return f"\n📋 {title} ({len(tasks)} found):\n" + "=" * 80 + "\n" + "❌ Error generating summary - please check the raw data above.\n"
+    
+    except Exception as e:
+        print(f"Error generating task summary: {e}")
+        # Return simple formatting
+        output = f"\n📋 {title} ({len(tasks)} found):\n"
+        output += "=" * 80 + "\n"
+        for i, task in enumerate(tasks, 1):
+            due_date_str = "No due date"
+            if task.get('due_date'):
+                try:
+                    if isinstance(task['due_date'], str):
+                        dt = datetime.fromisoformat(task['due_date'].replace('Z', '+00:00'))
+                        due_date_str = dt.strftime("%Y-%m-%d %H:%M")
+                    else:
+                        due_date_str = task['due_date']
+                except:
+                    due_date_str = str(task['due_date'])
+            
+            priority_emoji = {"High": "🔴", "Medium": "🟡", "Low": "🟢"}.get(task.get('priority', ''), "⚪")
+            status_emoji = {"To-Do": "⏳", "In Progress": "🔄", "Completed": "✅"}.get(task.get('status', ''), "❓")
+            category_emoji = {
+                "General": "📝", "Personal": "👤", "Fitness": "💪", 
+                "Fun": "🎉", "School": "📚"
+            }.get(task.get('category', ''), "📋")
+            
+            output += f"{i:2d}. {priority_emoji} {status_emoji} {category_emoji} {task.get('task_name', 'Untitled')}\n"
+            output += f"    📅 Due: {due_date_str}\n"
+            output += f"    🏷️  Priority: {task.get('priority', 'N/A')} | Category: {task.get('category', 'N/A')} | Status: {task.get('status', 'N/A')}\n"
+            
+            if task.get('notes'):
+                output += f"    📝 Notes: {task['notes']}\n"
+            
+            if task.get('id'):
+                output += f"    🆔 ID: {task['id'][:8]}...\n"
+            
+            output += "\n"
+        
+        return output
+
+def handle_task_query(user_input):
+    """
+    Task Query Handler
+    This function orchestrates the task query process:
+    1. Calls parse_query_parameters to extract filters and sorting
+    2. Calls get_tasks_from_notion to retrieve tasks
+    3. Uses LLM to generate natural language summary of results
+    """
+    
+    print(f"\n🔍 Processing task query: '{user_input}'")
+    
+    params = parse_query_parameters(user_input)
+    print(f"📊 Query parameters: {params}")
+    
+    result = get_tasks_from_notion(
+        filters=params.get('filters'),
+        sort_by=params.get('sort_by'),
+        limit=params.get('limit', 50)
+    )
+    
+    if "error" in result:
+        print(f"❌ Error retrieving tasks: {result['error']}")
+        return False
+    
+    tasks = result.get('tasks', [])
+    if not tasks:
+        print(f"📭 No tasks found matching your query: '{user_input}'")
+        print("💡 Try a broader search like 'all tasks' or 'tasks for this month'")
+        return True
+    
+    print(format_task_display(tasks, f"Tasks for '{user_input}'"))
+    return True
+    
 
 def get_task_input():
     """
-    Step 4: Get User Input
+    Get User Input
     This function handles getting input from the user (speech or text)
     """
     while True:
@@ -354,10 +585,6 @@ def get_task_input():
 
 
 def main():
-    """
-    Step 5: Main Function
-    This is the main loop that ties everything together
-    """
     print("🚀 Starting Notion Task Manager...")
     print("💡 This agent can:")
     print("   • Create new tasks")
@@ -366,7 +593,6 @@ def main():
     print("   • Search for specific tasks")
     print("   • Delete tasks")
     print("\n💡 Tips:")
-    print("   - Say 'quit' to exit")
     print("   - Be specific about dates, times, and details")
     print("   - For speech: Press ENTER to start, speak clearly and pause when done")
     print("   - Examples:")
@@ -388,7 +614,7 @@ def main():
         if intent == "CREATE_TASK":
             handle_task_creation(user_input)
         elif intent == "QUERY_TASKS":
-            print("🔍 Task querying not yet implemented")
+            handle_task_query(user_input)
         elif intent == "UPDATE_TASK":
             print("🔄 Task updating not yet implemented")
         elif intent == "DELETE_TASK":

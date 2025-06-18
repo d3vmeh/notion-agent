@@ -190,6 +190,10 @@ def get_tasks_from_notion(filters=None, sort_by=None, limit=50):
         filter_conditions = []
         if filters:
             for property_name, value in filters.items():
+                # Only add filters for non-None values
+                if value is None:
+                    continue
+                    
                 if property_name == "category":
                     filter_conditions.append({
                         "property": "Category",
