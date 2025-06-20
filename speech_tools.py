@@ -1,9 +1,6 @@
 import speech_recognition as sr
 import sounddevice as sd
-import numpy as np
-import threading
-import queue
-import time
+
 
 def listen_for_speech_push_to_talk():
 

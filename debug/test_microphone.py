@@ -13,7 +13,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 try:
     from speech_tools import test_microphone, listen_for_speech_push_to_talk
     import sounddevice as sd
-    import numpy as np
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("💡 Make sure you have installed the requirements:")
