@@ -584,6 +584,298 @@ def get_task_input():
             print("❌ Invalid choice. Please enter 1, 2, or 3.")
 
 
+
+"""
+TASK UPDATING
+"""
+
+def parse_update_request(user_input):
+    """
+    Parse Update Request
+    This function extracts what needs to be updated from natural language
+    """
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+
+    payload = {
+    "model": "gpt-4o-mini",
+    "messages": [
+        {
+        "role": "user",
+        "content": [
+            {
+            "type": "text",
+            "text": """
+            
+            You are an assistant that helps update tasks in a Notion schedule.
+
+            The user wants to update an existing task. You need to extract:
+            1. What task they want to update (task identifier)
+            2. What changes they want to make to the task
+
+            Respond in JSON format with this structure:
+
+            {
+                "task_identifier": {
+                    "type": "name/id/description",
+                    "value": "the identifier value"
+                },
+                "updates": {
+                    "task_name": "new name (if changing)",
+                    "due_date": "YYYY-MM-DD HH:MM (if changing)",
+                    "priority": "Low/Medium/High (if changing)",
+                    "category": "General/Personal/Fitness/Fun/School (if changing)",
+                    "status": "To-Do/In Progress/Completed (if changing)",
+                    "notes": "new notes (if changing)"
+                }
+            }
+
+            IMPORTANT RULES:
+            1. Only include fields in "updates" that are actually being changed
+            2. For task_identifier:
+               - "type": "name" if they mention the task name
+               - "type": "id" if they mention a specific ID
+               - "type": "description" if they describe the task
+            3. For dates: Use "YYYY-MM-DD HH:MM" format (24-hour)
+            4. For priority: Must be "Low", "Medium", or "High"
+            5. For category: Must be "General", "Personal", "Fitness", "Fun", or "School"
+            6. For status: Must be "To-Do", "In Progress", or "Completed"
+            7. If no specific changes mentioned, return empty "updates" object
+            8. Today's date is """ + str(datetime.now().strftime("%Y-%m-%d")) + """
+
+            EXAMPLES:
+
+            User: "Mark the workout task as completed"
+            Response: {
+                "task_identifier": {
+                    "type": "name",
+                    "value": "workout"
+                },
+                "updates": {
+                    "status": "Completed"
+                }
+            }
+
+            User: "Change the meeting with John to tomorrow at 3pm"
+            Response: {
+                "task_identifier": {
+                    "type": "description",
+                    "value": "meeting with John"
+                },
+                "updates": {
+                    "due_date": "2025-06-17 15:00"
+                }
+            }
+
+            User: "Update the project planning task to high priority and add notes about the deadline"
+            Response: {
+                "task_identifier": {
+                    "type": "name",
+                    "value": "project planning"
+                },
+                "updates": {
+                    "priority": "High",
+                    "notes": "Deadline approaching"
+                }
+            }
+
+            User: "Change the grocery shopping task category to Personal"
+            Response: {
+                "task_identifier": {
+                    "type": "name",
+                    "value": "grocery shopping"
+                },
+                "updates": {
+                    "category": "Personal"
+                }
+            }
+
+            User Input: """ + user_input + """
+            """
+            
+            }
+        ]
+        }
+    ],
+    
+    "max_tokens": 500
+    }
+
+    try:
+        response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+        response_data = response.json()
+        
+        if 'choices' in response_data and len(response_data['choices']) > 0:
+            result_text = response_data['choices'][0]['message']['content'].strip()
+            try:
+                result = json.loads(result_text)
+                return result
+            except json.JSONDecodeError as e:
+                print(f"❌ Error parsing update request: {e}")
+                return None
+        else:
+            return None
+    except Exception as e:
+        print(f"❌ Error parsing update request: {e}")
+        return None
+
+def identify_task_to_update(task_identifier, available_tasks):
+    """
+    Identify Task to Update
+    This function finds the specific task to update based on the identifier
+    """
+    if not available_tasks:
+        return None
+    
+    identifier_type = task_identifier.get('type', 'name')
+    identifier_value = task_identifier.get('value', '').lower()
+    
+    if identifier_type == 'id':
+        for task in available_tasks:
+            if task.get('id', '').startswith(identifier_value):
+                return task
+        return None
+    
+    elif identifier_type == 'name':
+        best_match = None
+        best_score = 0
+        
+        for task in available_tasks:
+            task_name = task.get('task_name', '').lower()
+            
+            if task_name == identifier_value:
+                return task
+            
+            if identifier_value in task_name or task_name in identifier_value:
+                score = len(set(identifier_value.split()) & set(task_name.split()))
+                if score > best_score:
+                    best_score = score
+                    best_match = task
+        
+        return best_match
+    
+    elif identifier_type == 'description':
+        best_match = None
+        best_score = 0
+        
+        for task in available_tasks:
+            task_name = task.get('task_name', '').lower()
+            task_notes = task.get('notes', '').lower()
+            task_text = f"{task_name} {task_notes}"
+            
+            identifier_words = set(identifier_value.split())
+            task_words = set(task_text.split())
+            score = len(identifier_words & task_words)
+            
+            if score > best_score:
+                best_score = score
+                best_match = task
+        
+        return best_match
+    
+    return None
+
+def handle_task_update(user_input):
+    """
+    Task Update Handler
+    This function orchestrates the task update process:
+    1. Parses the update request to understand what needs to be changed
+    2. Retrieves available tasks to find the target task
+    3. Identifies the specific task to update
+    4. Calls the update function
+    5. Provides feedback to the user
+    """
+    
+    print(f"\n🔄 Processing task update: '{user_input}'")
+    
+    update_info = parse_update_request(user_input)
+    if not update_info:
+        print("❌ Could not understand what you want to update. Please be more specific.")
+        print("💡 Examples:")
+        print("   • 'Mark the workout task as completed'")
+        print("   • 'Change the meeting time to 3pm'")
+        print("   • 'Update the project task to high priority'")
+        return False
+    
+    task_identifier = update_info.get('task_identifier', {})
+    updates = update_info.get('updates', {})
+    
+    if not updates:
+        print("❌ No changes specified. Please tell me what you want to update.")
+        return False
+    
+    print(f"📝 Identified updates: {list(updates.keys())}")
+    
+    print("🔍 Retrieving available tasks to find the target task...")
+    result = get_tasks_from_notion(limit=100)  # Get more tasks for better matching
+    
+    if "error" in result:
+        print(f"❌ Error retrieving tasks: {result['error']}")
+        return False
+    
+    available_tasks = result.get('tasks', [])
+    if not available_tasks:
+        print("❌ No tasks found in your Notion database.")
+        return False
+    
+    target_task = identify_task_to_update(task_identifier, available_tasks)
+    
+    if not target_task:
+        print(f"❌ Could not find a task matching '{task_identifier.get('value', '')}'")
+        print("💡 Available tasks:")
+        for i, task in enumerate(available_tasks[:10], 1):
+            print(f"   {i}. {task.get('task_name', 'Untitled')}")
+        if len(available_tasks) > 10:
+            print(f"   ... and {len(available_tasks) - 10} more tasks")
+        return False
+    
+    print(f"✅ Found target task: {target_task.get('task_name', 'Untitled')}")
+    
+    print(f"🔄 Updating task...")
+    update_result = update_task_in_notion(target_task['id'], updates)
+    
+    if "error" in update_result:
+        print(f"❌ Error updating task: {update_result['error']}")
+        return False
+    
+    print(f"✅ Task updated successfully!")
+    print(f"📝 Updated fields: {', '.join(update_result.get('updated_fields', []))}")
+    
+    print(f"\n📋 Updated Task Details:")
+    print(f"   📝 Name: {target_task.get('task_name', 'Untitled')}")
+    
+    if 'due_date' in updates:
+        print(f"   📅 Due Date: {updates['due_date']}")
+    else:
+        due_date = target_task.get('due_date')
+        if due_date:
+            print(f"   📅 Due Date: {due_date}")
+    
+    if 'priority' in updates:
+        print(f"   🏷️  Priority: {updates['priority']}")
+    else:
+        print(f"   🏷️  Priority: {target_task.get('priority', 'N/A')}")
+    
+    if 'category' in updates:
+        print(f"   📂 Category: {updates['category']}")
+    else:
+        print(f"   📂 Category: {target_task.get('category', 'N/A')}")
+    
+    if 'status' in updates:
+        print(f"   📊 Status: {updates['status']}")
+    else:
+        print(f"   📊 Status: {target_task.get('status', 'N/A')}")
+    
+    if 'notes' in updates:
+        print(f"   📝 Notes: {updates['notes']}")
+    elif target_task.get('notes'):
+        print(f"   📝 Notes: {target_task.get('notes')}")
+    
+    return True
+
+
 def main():
     print("🚀 Starting Notion Task Manager...")
     print("💡 This agent can:")
@@ -616,7 +908,7 @@ def main():
         elif intent == "QUERY_TASKS":
             handle_task_query(user_input)
         elif intent == "UPDATE_TASK":
-            print("🔄 Task updating not yet implemented")
+            handle_task_update(user_input)
         elif intent == "DELETE_TASK":
             print("🗑️  Task deletion not yet implemented")
         elif intent == "SEARCH_TASKS":

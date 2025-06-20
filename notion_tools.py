@@ -243,12 +243,18 @@ def get_tasks_from_notion(filters=None, sort_by=None, limit=50):
         print(f"📈 Sort: {sorts}")
         print(f"📏 Limit: {limit}")
         
-        response = notion.databases.query(
-            database_id=database_id,
-            filter={"and": filter_conditions} if filter_conditions else None,
-            sorts=sorts,
-            page_size=limit
-        )
+        # Build the query parameters
+        query_params = {
+            "database_id": database_id,
+            "sorts": sorts,
+            "page_size": limit
+        }
+        
+        # Only add filter if there are filter conditions
+        if filter_conditions:
+            query_params["filter"] = {"and": filter_conditions}
+        
+        response = notion.databases.query(**query_params)
         
         tasks = []
         for page in response["results"]:
