@@ -34,7 +34,7 @@ Each task includes:
 ### Prerequisites
 
 - Python 3.8 or higher
-- A Notion account with a database
+- A Notion account with a database and [integration](https://www.notion.com/integrations)
 - OpenAI API key
 
 ### Setup
