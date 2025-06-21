@@ -42,7 +42,7 @@ def determine_user_intent(user_input):
             - "Add a meeting tomorrow at 2pm" → CREATE_TASK
             - "Show me my tasks for this week" → QUERY_TASKS
             - "What tasks do I have today?" → QUERY_TASKS
-            - "Mark the workout task as completed" → UPDATE_TASK
+            - "Mark the workout task as Done" → UPDATE_TASK
             - "Change the meeting time to 3pm" → UPDATE_TASK
             - "Delete the old task" → DELETE_TASK
             - "Find tasks about project planning" → SEARCH_TASKS
@@ -106,7 +106,7 @@ def request_task_addition(question):
                     "due_date": "YYYY-MM-DD HH:MM",
                     "priority": "Low/Medium/High",
                     "category": "General/Personal/Fitness/Fun/School",
-                    "status": "To-Do/In Progress/Completed",
+                    "status": "To-Do/In Progress/Done",
                     "notes": "Additional details, description, or context about the task"
                 }
             ]
@@ -115,7 +115,7 @@ def request_task_addition(question):
             1. The due_date must be in the format "YYYY-MM-DD HH:MM" (24-hour format)
             2. Priority must be exactly one of: "Low", "Medium", or "High" (case-sensitive)
             3. Category must be exactly one of: "General", "Personal", "Fitness", "Fun", or "School" (case-sensitive)
-            4. Status must be exactly one of: "To-Do", "In Progress", or "Completed" (case-sensitive)
+            4. Status must be exactly one of: "To-Do", "In Progress", or "Done" (case-sensitive)
             5. Notes should contain relevant details, context, or description about the task
             6. If the user doesn't specify a field, use these defaults:
                - priority: "Medium"
@@ -327,7 +327,7 @@ def parse_query_parameters(user_input):
                 1. Date range (today, this week, this month, tomorrow, next week, etc.)
                 2. Category filter (General, Personal, Fitness, Fun, School)
                 3. Priority filter (Low, Medium, High)
-                4. Status filter (To-Do, In Progress, Completed)
+                4. Status filter (To-Do, In Progress, Done)
                 5. Sort preference (by due date, priority, etc.)
                 6. Limit (how many tasks to show)
                 
@@ -351,7 +351,7 @@ def parse_query_parameters(user_input):
                 Examples:
                 - "Show me tasks for this week" → {{"filters": {{"date_range": ["2025-06-16", "2025-06-22"]}}, "sort_by": {{"property": "due_date", "direction": "ascending"}}, "limit": 50}}
                 - "High priority tasks" → {{"filters": {{"priority": "High"}}, "sort_by": {{"property": "due_date", "direction": "ascending"}}, "limit": 50}}
-                - "Completed fitness tasks" → {{"filters": {{"category": "Fitness", "status": "Completed"}}, "sort_by": null, "limit": 50}}
+                - "Completed fitness tasks" → {{"filters": {{"category": "Fitness", "status": "Done"}}, "sort_by": null, "limit": 50}}
                 - "All tasks" → {{"filters": {{}}, "sort_by": {{"property": "due_date", "direction": "ascending"}}, "limit": 50}}
                 
                 User input: "{user_input}"
@@ -474,7 +474,7 @@ def format_task_display(tasks, title="Tasks"):
                     due_date_str = str(task['due_date'])
             
             priority_emoji = {"High": "🔴", "Medium": "🟡", "Low": "🟢"}.get(task.get('priority', ''), "⚪")
-            status_emoji = {"To-Do": "⏳", "In Progress": "🔄", "Completed": "✅"}.get(task.get('status', ''), "❓")
+            status_emoji = {"To-Do": "⏳", "In Progress": "🔄", "Done": "✅"}.get(task.get('status', ''), "❓")
             category_emoji = {
                 "General": "📝", "Personal": "👤", "Fitness": "💪", 
                 "Fun": "🎉", "School": "📚"
@@ -627,7 +627,7 @@ def parse_update_request(user_input):
                     "due_date": "YYYY-MM-DD HH:MM (if changing)",
                     "priority": "Low/Medium/High (if changing)",
                     "category": "General/Personal/Fitness/Fun/School (if changing)",
-                    "status": "To-Do/In Progress/Completed (if changing)",
+                    "status": "To-Do/In Progress/Done (if changing)",
                     "notes": "new notes (if changing)"
                 }
             }
@@ -641,20 +641,20 @@ def parse_update_request(user_input):
             3. For dates: Use "YYYY-MM-DD HH:MM" format (24-hour)
             4. For priority: Must be "Low", "Medium", or "High"
             5. For category: Must be "General", "Personal", "Fitness", "Fun", or "School"
-            6. For status: Must be "To-Do", "In Progress", or "Completed"
+            6. For status: Must be "To-Do", "In Progress", or "Done"
             7. If no specific changes mentioned, return empty "updates" object
             8. Today's date is """ + str(datetime.now().strftime("%Y-%m-%d")) + """
 
             EXAMPLES:
 
-            User: "Mark the workout task as completed"
+            User: "Mark the workout task as Done"
             Response: {
                 "task_identifier": {
                     "type": "name",
                     "value": "workout"
                 },
                 "updates": {
-                    "status": "Completed"
+                    "status": "Done"
                 }
             }
 
@@ -794,7 +794,7 @@ def handle_task_update(user_input):
     if not update_info:
         print("❌ Could not understand what you want to update. Please be more specific.")
         print("💡 Examples:")
-        print("   • 'Mark the workout task as completed'")
+        print("   • 'Mark the workout task as Done'")
         print("   • 'Change the meeting time to 3pm'")
         print("   • 'Update the project task to high priority'")
         return False
@@ -890,7 +890,7 @@ def main():
     print("   - Examples:")
     print("     • 'Add a meeting tomorrow at 2pm'")
     print("     • 'Show me tasks for this week'")
-    print("     • 'Mark the workout task as completed'")
+    print("     • 'Mark the workout task as Done'")
     print("     • 'Find tasks about project planning'")
     
     while True:
