@@ -876,6 +876,258 @@ def handle_task_update(user_input):
     return True
 
 
+"""
+TASK DELETION
+"""
+
+def parse_delete_request(user_input):
+    """
+    Parse Delete Request
+    This function extracts what task needs to be deleted from natural language
+    """
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+
+    payload = {
+    "model": "gpt-4o-mini",
+    "messages": [
+        {
+        "role": "user",
+        "content": [
+            {
+            "type": "text",
+            "text": """
+            
+            You are an assistant that helps delete tasks from a Notion schedule.
+
+            The user wants to delete an existing task. You need to extract:
+            1. What task they want to delete (task identifier)
+
+            Respond in JSON format with this structure:
+
+            {
+                "task_identifier": {
+                    "type": "name/id/description",
+                    "value": "the identifier value"
+                }
+            }
+
+            IMPORTANT RULES:
+            1. For task_identifier:
+               - "type": "name" if they mention the task name
+               - "type": "id" if they mention a specific ID
+               - "type": "description" if they describe the task
+            2. Extract the most specific identifier possible
+            3. If multiple tasks could match, prefer the most specific one
+
+            EXAMPLES:
+
+            User: "Delete the workout task"
+            Response: {
+                "task_identifier": {
+                    "type": "name",
+                    "value": "workout"
+                }
+            }
+
+            User: "Remove the meeting with John"
+            Response: {
+                "task_identifier": {
+                    "type": "description",
+                    "value": "meeting with John"
+                }
+            }
+
+            User: "Delete task abc123"
+            Response: {
+                "task_identifier": {
+                    "type": "id",
+                    "value": "abc123"
+                }
+            }
+
+            User: "Remove the grocery shopping task"
+            Response: {
+                "task_identifier": {
+                    "type": "name",
+                    "value": "grocery shopping"
+                }
+            }
+
+            User Input: """ + user_input + """
+            """
+            
+            }
+        ]
+        }
+    ],
+    
+    "max_tokens": 300
+    }
+
+    try:
+        response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+        response_data = response.json()
+        
+        if 'choices' in response_data and len(response_data['choices']) > 0:
+            result_text = response_data['choices'][0]['message']['content'].strip()
+            try:
+                result = json.loads(result_text)
+                return result
+            except json.JSONDecodeError as e:
+                print(f"❌ Error parsing delete request: {e}")
+                return None
+        else:
+            return None
+    except Exception as e:
+        print(f"❌ Error parsing delete request: {e}")
+        return None
+
+def identify_task_to_delete(task_identifier, available_tasks):
+    """
+    Identify Task to Delete
+    This function finds the specific task to delete based on the identifier
+    """
+    if not available_tasks:
+        return None
+    
+    identifier_type = task_identifier.get('type', 'name')
+    identifier_value = task_identifier.get('value', '').lower()
+    
+    if identifier_type == 'id':
+        for task in available_tasks:
+            if task.get('id', '').startswith(identifier_value):
+                return task
+        return None
+    
+    elif identifier_type == 'name':
+        best_match = None
+        best_score = 0
+        
+        for task in available_tasks:
+            task_name = task.get('task_name', '').lower()
+            
+            if task_name == identifier_value:
+                return task
+            
+            if identifier_value in task_name or task_name in identifier_value:
+                score = len(set(identifier_value.split()) & set(task_name.split()))
+                if score > best_score:
+                    best_score = score
+                    best_match = task
+        
+        return best_match
+    
+    elif identifier_type == 'description':
+        best_match = None
+        best_score = 0
+        
+        for task in available_tasks:
+            task_name = task.get('task_name', '').lower()
+            task_notes = task.get('notes', '').lower()
+            task_text = f"{task_name} {task_notes}"
+            
+            identifier_words = set(identifier_value.split())
+            task_words = set(task_text.split())
+            score = len(identifier_words & task_words)
+            
+            if score > best_score:
+                best_score = score
+                best_match = task
+        
+        return best_match
+    
+    return None
+
+def handle_task_deletion(user_input):
+    """
+    Task Deletion Handler
+    This function orchestrates the task deletion process:
+    1. Parses the delete request to understand what task to delete
+    2. Retrieves available tasks to find the target task
+    3. Identifies the specific task to delete
+    4. Confirms deletion with user
+    5. Calls the delete function
+    6. Provides feedback to the user
+    """
+    
+    print(f"\n🗑️  Processing task deletion: '{user_input}'")
+    
+    delete_info = parse_delete_request(user_input)
+    if not delete_info:
+        print("❌ Could not understand what task you want to delete. Please be more specific.")
+        print("💡 Examples:")
+        print("   • 'Delete the workout task'")
+        print("   • 'Remove the meeting with John'")
+        print("   • 'Delete task abc123'")
+        return False
+    
+    task_identifier = delete_info.get('task_identifier', {})
+    
+    print("🔍 Retrieving available tasks to find the target task...")
+    result = get_tasks_from_notion(limit=100)
+    
+    if "error" in result:
+        print(f"❌ Error retrieving tasks: {result['error']}")
+        return False
+    
+    available_tasks = result.get('tasks', [])
+    if not available_tasks:
+        print("❌ No tasks found in your Notion database.")
+        return False
+    
+    target_task = identify_task_to_delete(task_identifier, available_tasks)
+    
+    if not target_task:
+        print(f"❌ Could not find a task matching '{task_identifier.get('value', '')}'")
+        print("💡 Available tasks:")
+        for i, task in enumerate(available_tasks[:10], 1):
+            print(f"   {i}. {task.get('task_name', 'Untitled')}")
+        if len(available_tasks) > 10:
+            print(f"   ... and {len(available_tasks) - 10} more tasks")
+        return False
+    
+    print(f"✅ Found target task: {target_task.get('task_name', 'Untitled')}")
+    
+    # Confirmation
+    print(f"\n📋 Task Details:")
+    print(f"   📝 Name: {target_task.get('task_name', 'Untitled')}")
+    
+    due_date = target_task.get('due_date')
+    if due_date:
+        print(f"   📅 Due Date: {due_date}")
+    
+    print(f"   🏷️  Priority: {target_task.get('priority', 'N/A')}")
+    print(f"   📂 Category: {target_task.get('category', 'N/A')}")
+    print(f"   📊 Status: {target_task.get('status', 'N/A')}")
+    
+    if target_task.get('notes'):
+        print(f"   📝 Notes: {target_task.get('notes')}")
+    
+    print(f"\n⚠️  Are you sure you want to delete this task?")
+    print("💡 Note: Tasks are archived in Notion (not permanently deleted)")
+    confirm = input("Type 'yes' to confirm deletion: ").strip().lower()
+    
+    if confirm != 'yes':
+        print("❌ Deletion cancelled.")
+        return False
+    
+    print(f"🗑️  Deleting task...")
+    delete_result = delete_task_from_notion(target_task['id'])
+    
+    if "error" in delete_result:
+        print(f"❌ Error deleting task: {delete_result['error']}")
+        return False
+    
+    print(f"✅ Task deleted successfully!")
+    print(f"📝 Deleted task: {target_task.get('task_name', 'Untitled')}")
+    print(f"💡 The task has been archived in Notion")
+    
+    return True
+
+
 def main():
     print("🚀 Starting Notion Task Manager...")
     print("💡 This agent can:")
@@ -891,6 +1143,7 @@ def main():
     print("     • 'Add a meeting tomorrow at 2pm'")
     print("     • 'Show me tasks for this week'")
     print("     • 'Mark the workout task as Done'")
+    print("     • 'Delete the grocery shopping task'")
     print("     • 'Find tasks about project planning'")
     
     while True:
@@ -910,7 +1163,7 @@ def main():
         elif intent == "UPDATE_TASK":
             handle_task_update(user_input)
         elif intent == "DELETE_TASK":
-            print("🗑️  Task deletion not yet implemented")
+            handle_task_deletion(user_input)
         elif intent == "SEARCH_TASKS":
             print("🔎 Task searching not yet implemented")
         else:
@@ -919,6 +1172,7 @@ def main():
             print("   • 'Add a task' - to create new tasks")
             print("   • 'Show my tasks' - to view existing tasks")
             print("   • 'Update task' - to modify existing tasks")
+            print("   • 'Delete task' - to remove existing tasks")
 
 
 if __name__ == "__main__":
