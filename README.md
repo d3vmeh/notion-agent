@@ -11,6 +11,7 @@ A comprehensive Python-based task management AI agent that integrates with Notio
 - **📋 Task Creation**: Add single or multiple tasks with intelligent parsing
 - **🔍 Task Querying**: View and filter tasks with natural language queries
 - **🔄 Task Updating**: Modify existing tasks using natural language
+- **🗑️ Task Deletion**: Remove tasks with confirmation and safety checks
 
 
 ### Smart Features
@@ -112,6 +113,14 @@ python notion_manager_agent.py
 "Change the status of the presentation task to In Progress"
 ```
 
+### Task Deletion
+```
+"Delete the workout task"
+"Remove the meeting with John"
+"Delete task abc123"
+"Remove the grocery shopping task"
+```
+
 ## 🔧 How It Works
 
 ### Intent Classification
@@ -119,8 +128,7 @@ The agent uses GPT-4 to automatically classify your intent:
 - **CREATE_TASK**: Adding new tasks
 - **QUERY_TASKS**: Viewing and filtering tasks
 - **UPDATE_TASK**: Modifying existing tasks
-- **DELETE_TASK**: Removing tasks (coming soon)
-- **SEARCH_TASKS**: Finding specific tasks (coming soon)
+- **DELETE_TASK**: Removing tasks with confirmation
 
 ### Task Creation Process
 1. **Intent Detection**: Determines you want to create tasks
@@ -140,6 +148,14 @@ The agent uses GPT-4 to automatically classify your intent:
 3. **Task Identification**: Finds the specific task in your database
 4. **Update Execution**: Modifies the task in Notion
 5. **Confirmation**: Shows updated task details
+
+### Task Deletion Process
+1. **Intent Detection**: Determines you want to delete a task
+2. **Delete Parsing**: Extracts what task to delete from natural language
+3. **Task Identification**: Finds the specific task in your database
+4. **Safety Confirmation**: Shows task details and asks for confirmation
+5. **Deletion Execution**: Archives the task in Notion (not permanently deleted)
+6. **Confirmation**: Confirms successful deletion
 
 ## 🔧 Configuration
 
